@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Workspace Share</title>
+<style>body{font-family:Arial,Helvetica,sans-serif;padding:16px;}button{margin-top:8px;padding:8px}</style>
+</head>
+<body>
+<h2>Espaço compartilhado</h2>
+<p>Esta página mostra as URLs do espaço. Use o botão abaixo para copiar o link de importação e cole no campo 'Importar' da extensão.</p>
+<div id="list"></div>
+<button id="copyBtn">Copiar link de importação</button>
+<script>
+function getParam(name) { const u = new URL(window.location.href); return u.searchParams.get(name); }
+const dataParam = getParam('data');
+let urls = [];
+try { urls = JSON.parse(decodeURIComponent(dataParam || '')); } catch(e){ urls = []; }
+const list = document.getElementById('list');
+if(urls.length === 0){ list.innerText = 'Nenhuma URL encontrada.'; }
+else {
+  const ul = document.createElement('ul');
+  urls.forEach(u => { const li = document.createElement('li'); const a = document.createElement('a'); a.href = u; a.innerText = u; a.target = '_blank'; li.appendChild(a); ul.appendChild(li); });
+  list.appendChild(ul);
+}
+document.getElementById('copyBtn').addEventListener('click', async ()=>{
+  const encoded = encodeURIComponent(JSON.stringify(urls));
+  const importLink = 'https://workspace-share/?data=' + encoded;
+  try {
+    await navigator.clipboard.writeText(importLink);
+    alert('Link de importação copiado! Abra a extensão e cole no campo "Importar".');
+  } catch(e) {
+    prompt('Copie o link de importação abaixo:', importLink);
+  }
+});
+</script>
+</body>
+</html>
