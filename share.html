@@ -411,9 +411,57 @@
                 `;
             }
         }
+
+
+        // Função para encontrar a extensão dinamicamente
+async function findExtensionId() {
+  try {
+    // Tenta encontrar a extensão pelo nome
+    const extensions = await chrome.management.getAll();
+    const extension = extensions.find(ext => 
+      ext.name === "Workspaces Saver" && 
+      ext.enabled
+    );
+    return extension ? extension.id : null;
+  } catch (e) {
+    console.error('Erro ao buscar extensão:', e);
+    return null;
+  }
+}
+
+// Função principal modificada
+async function openAllViaExtension(urls) {
+  if (!urls || !urls.length) return alert('Nenhuma URL.');
+  
+  let extId = "nnidkpihcfemhdejddiggaklbomnngjc"; // ID fixo
+  
+  // Se o ID fixo não funcionar, tenta encontrar dinamicamente
+  if (extId === "nnidkpihcfemhdejddiggaklbomnngjc" || !extId) {
+    extId = await findExtensionId();
+    if (!extId) {
+      return alert('Extensão Workspaces Saver não encontrada. Por favor, instale a extensão primeiro.');
+    }
+  }
+
+  try {
+    chrome.runtime.sendMessage(extId, { type: 'open_tabs', urls }, (resp) => {
+      if (chrome.runtime.lastError) {
+        alert('Extensão não encontrada ou sem permissão para conectar. Por favor instale a extensão e tente novamente.');
+      } else if (resp && resp.ok) {
+        alert('Solicitação enviada à extensão. As abas serão abertas.');
+      } else {
+        alert('Resposta da extensão: ' + (resp && resp.error ? resp.error : 'erro desconhecido'));
+      }
+    });
+  } catch (e) {
+    alert('Não foi possível enviar mensagem para a extensão: ' + e.message);
+  }
+}
         
         // Inicializar
         document.addEventListener('DOMContentLoaded', detectExtension);
     </script>
+
+    
 </body>
 </html>
