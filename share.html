@@ -10,11 +10,13 @@
     button:hover { background: #45a049; }
     button.secondary { background: #008CBA; }
     button.secondary:hover { background: #007B9A; }
+    button:disabled { background: #cccccc; cursor: not-allowed; }
     ul { list-style-type: none; padding: 0; }
     li { margin: 8px 0; padding: 8px; background: #f9f9f9; border-left: 4px solid #4CAF50; }
     a { color: #0066cc; text-decoration: none; }
     a:hover { text-decoration: underline; }
     .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 4px; margin: 15px 0; }
+    .success { background: #d4edda; border: 1px solid #c3e6cb; padding: 10px; border-radius: 4px; margin: 15px 0; }
   </style>
 </head>
 <body>
@@ -27,16 +29,21 @@
   <div class="warning" id="extensionWarning" style="display: none;">
     <strong>⚠️ Extensão necessária:</strong> Para abrir todas as abas automaticamente, 
     você precisa ter a extensão "Workspaces Saver" instalada.
-    <button id="installExtension" style="margin-left: 10px;">Instalar Extensão</button>
+    <br><br>
+    <strong>ID da Extensão:</strong> <code id="extensionId">nnidkpihcfemhdejddiggaklbomnngjc</code>
+    <button onclick="copyExtensionId()" style="margin-left: 10px;">📋 Copiar ID</button>
   </div>
 
   <div id="actions" style="display: none;">
-    <button id="openAllBtn">🔓 Abrir Todas as Abas</button>
+    <button id="openAllBtn">🔓 Abrir Todas as Abas (via Extensão)</button>
     <button id="copyImportBtn" class="secondary">📋 Copiar Link de Importação</button>
     <button id="openIndividualBtn" class="secondary">🔗 Abrir Abas Individualmente</button>
   </div>
 
   <script>
+    // ID FIXO da extensão - SUBSTITUA pelo ID real da SUA extensão
+    const EXTENSION_ID = "nnidkpihcfemhdejddiggaklbomnngjc";
+
     // Extrai URLs do parâmetro data na URL
     function getUrlsFromUrl() {
       const urlParams = new URLSearchParams(window.location.search);
@@ -52,50 +59,67 @@
       }
     }
 
-    // Função para encontrar a extensão dinamicamente
-    async function findExtensionId() {
-      try {
-        // Tenta encontrar a extensão pelo nome
-        const extensions = await chrome.management.getAll();
-        const extension = extensions.find(ext => 
-          ext.name === "Workspaces Saver" && 
-          ext.enabled
-        );
-        return extension ? extension.id : null;
-      } catch (e) {
-        console.error('Erro ao buscar extensão:', e);
-        return null;
-      }
+    // Função para verificar se a extensão está instalada
+    async function checkExtensionInstalled() {
+      return new Promise((resolve) => {
+        // Tenta enviar uma mensagem de ping para a extensão
+        chrome.runtime.sendMessage(EXTENSION_ID, { type: 'ping' }, (response) => {
+          if (chrome.runtime.lastError) {
+            // Extensão não encontrada ou não respondeu
+            resolve(false);
+          } else {
+            resolve(true);
+          }
+        });
+        
+        // Timeout para caso a extensão não responda
+        setTimeout(() => resolve(false), 1000);
+      });
     }
 
     // Função principal para abrir abas via extensão
     async function openAllViaExtension(urls) {
-      if (!urls || !urls.length) return alert('Nenhuma URL encontrada.');
-      
-      // Tenta encontrar a extensão dinamicamente
-      const extId = await findExtensionId();
-      if (!extId) {
+      if (!urls || !urls.length) {
+        alert('❌ Nenhuma URL encontrada.');
+        return;
+      }
+
+      // Verifica se a extensão está instalada
+      const isInstalled = await checkExtensionInstalled();
+      if (!isInstalled) {
         document.getElementById('extensionWarning').style.display = 'block';
         return;
       }
 
       try {
-        chrome.runtime.sendMessage(extId, { type: 'open_tabs', urls }, (resp) => {
+        // Envia a mensagem para a extensão abrir as abas
+        chrome.runtime.sendMessage(EXTENSION_ID, { 
+          type: 'open_tabs', 
+          urls: urls 
+        }, (response) => {
           if (chrome.runtime.lastError) {
+            console.error('Erro:', chrome.runtime.lastError);
             document.getElementById('extensionWarning').style.display = 'block';
-          } else if (resp && resp.ok) {
+          } else if (response && response.ok) {
             alert(`✅ ${urls.length} abas serão abertas pela extensão!`);
           } else {
-            alert('❌ Resposta da extensão: ' + (resp && resp.error ? resp.error : 'erro desconhecido'));
+            alert('❌ Erro na extensão: ' + (response && response.error ? response.error : 'erro desconhecido'));
           }
         });
       } catch (e) {
+        console.error('Erro ao enviar mensagem:', e);
         document.getElementById('extensionWarning').style.display = 'block';
       }
     }
 
     // Função para abrir abas individualmente (fallback)
     function openUrlsIndividual(urls) {
+      if (!urls || !urls.length) {
+        alert('❌ Nenhuma URL encontrada.');
+        return;
+      }
+      
+      // Abre cada URL em uma nova aba
       urls.forEach(url => {
         window.open(url, '_blank');
       });
@@ -104,8 +128,13 @@
 
     // Função para copiar link de importação
     async function copyImportLink(urls) {
+      if (!urls || !urls.length) {
+        alert('❌ Nenhuma URL encontrada.');
+        return;
+      }
+
       const encoded = encodeURIComponent(JSON.stringify(urls));
-      const importLink = `https://lucas-brito-de-sousa.github.io/meu-repositorio/share.html?data=${encoded}`;
+      const importLink = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
       
       try {
         await navigator.clipboard.writeText(importLink);
@@ -116,11 +145,22 @@
       }
     }
 
+    // Função para copiar ID da extensão
+    async function copyExtensionId() {
+      try {
+        await navigator.clipboard.writeText(EXTENSION_ID);
+        alert('✅ ID da extensão copiado!');
+      } catch (e) {
+        prompt('📋 Copie o ID da extensão:', EXTENSION_ID);
+      }
+    }
+
     // Inicialização da página
     document.addEventListener('DOMContentLoaded', async () => {
       const urls = getUrlsFromUrl();
       const contentDiv = document.getElementById('content');
       const actionsDiv = document.getElementById('actions');
+      const openAllBtn = document.getElementById('openAllBtn');
 
       if (!urls.length) {
         contentDiv.innerHTML = '<p style="color: red;">❌ Nenhum workspace encontrado no link.</p>';
@@ -131,7 +171,9 @@
       let html = `<h2>📋 ${urls.length} Abas no Workspace</h2>`;
       html += '<ul>';
       urls.forEach(url => {
-        html += `<li><a href="${url}" target="_blank">${url}</a></li>`;
+        // Encurta URLs muito longas para melhor visualização
+        const displayUrl = url.length > 60 ? url.substring(0, 60) + '...' : url;
+        html += `<li><a href="${url}" target="_blank" title="${url}">${displayUrl}</a></li>`;
       });
       html += '</ul>';
       contentDiv.innerHTML = html;
@@ -139,19 +181,18 @@
       // Mostra os botões de ação
       actionsDiv.style.display = 'block';
 
+      // Verifica se a extensão está instalada e atualiza a UI
+      const isInstalled = await checkExtensionInstalled();
+      if (!isInstalled) {
+        openAllBtn.disabled = true;
+        openAllBtn.title = 'Extensão não encontrada';
+        document.getElementById('extensionWarning').style.display = 'block';
+      }
+
       // Configura os event listeners
       document.getElementById('openAllBtn').addEventListener('click', () => openAllViaExtension(urls));
       document.getElementById('copyImportBtn').addEventListener('click', () => copyImportLink(urls));
       document.getElementById('openIndividualBtn').addEventListener('click', () => openUrlsIndividual(urls));
-      document.getElementById('installExtension').addEventListener('click', () => {
-        alert('Para instalar a extensão, visite: chrome://extensions/ e adicione a extensão "Workspaces Saver"');
-      });
-
-      // Verifica se a extensão está instalada
-      const extId = await findExtensionId();
-      if (!extId) {
-        document.getElementById('extensionWarning').style.display = 'block';
-      }
     });
   </script>
 </body>
