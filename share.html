@@ -1,467 +1,158 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Workspace Share</title>
-    <style>
-        :root {
-            --bg: #0f1724;
-            --card: #0b1220;
-            --muted: #9aa4b2;
-            --accent: #7dd3fc;
-            --accent-2: #60a5fa;
-            --glass: rgba(255,255,255,0.03);
-            --radius: 14px;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-            color: white;
-        }
-        
-        .container {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(20px);
-            border-radius: 20px;
-            padding: 30px;
-            max-width: 600px;
-            width: 100%;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            text-align: center;
-        }
-        
-        h1 {
-            margin-bottom: 20px;
-            font-size: 2em;
-        }
-        
-        .status {
-            margin: 20px 0;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-        }
-        
-        .loading {
-            display: inline-block;
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: white;
-            animation: spin 1s ease-in-out infinite;
-            margin: 10px 0;
-        }
-        
-        .success { color: #00ff88; }
-        .error { color: #ff4444; }
-        .warning { color: #ffcc00; }
-        
-        button {
-            background: linear-gradient(135deg, var(--accent), var(--accent-2));
-            border: none;
-            color: #04263b;
-            padding: 15px 30px;
-            border-radius: 25px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 1.1em;
-            margin: 10px 0;
-            transition: transform 0.2s;
-        }
-        
-        button:hover {
-            transform: translateY(-2px);
-        }
-        
-        button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        .progress-container {
-            width: 100%;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 10px;
-            margin: 20px 0;
-            overflow: hidden;
-            height: 10px;
-        }
-        
-        .progress-bar {
-            height: 100%;
-            background: linear-gradient(90deg, #00ff88, #00ccff);
-            border-radius: 10px;
-            transition: width 0.3s ease;
-            width: 0%;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        .extension-id {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 10px;
-            border-radius: 8px;
-            margin: 10px 0;
-            font-family: monospace;
-            font-size: 0.9em;
-            word-break: break-all;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workspace Compartilhado</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+    button { margin: 10px 5px; padding: 10px 15px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #45a049; }
+    button.secondary { background: #008CBA; }
+    button.secondary:hover { background: #007B9A; }
+    ul { list-style-type: none; padding: 0; }
+    li { margin: 8px 0; padding: 8px; background: #f9f9f9; border-left: 4px solid #4CAF50; }
+    a { color: #0066cc; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 4px; margin: 15px 0; }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🚀 Workspace Share</h1>
-        
-        <div id="status" class="status">
-            <div class="loading"></div>
-            <p>Conectando com a extensão...</p>
-        </div>
-        
-        <div class="progress-container">
-            <div class="progress-bar" id="progressBar"></div>
-        </div>
-        
-        <div id="extensionInfo" style="display: none;">
-            <h3>📋 ID da Extensão:</h3>
-            <div class="extension-id" id="extensionId"></div>
-            <p style="font-size: 0.9em; margin-top: 10px;">
-                Certifique-se de que a extensão Workspaces Saver está instalada
-            </p>
-        </div>
-        
-        <div id="actionButtons" style="display: none;">
-            <button id="openWithExtensionBtn" onclick="openWithExtension()">
-                🔗 Abrir com Extensão (Recomendado)
-            </button>
-            <button id="openFallbackBtn" onclick="openFallback()">
-                ⚡ Tentar Abrir Automaticamente
-            </button>
-        </div>
-        
-        <div id="results" style="margin-top: 20px;"></div>
-    </div>
-
-    <script>
-        let workspaceData = null;
-        const extensionId = 'nnidkpihcfemhdejddiggaklbomnngjc'; // Você vai substituir isso
-        
-        // Função para obter parâmetros da URL
-        function getUrlParams() {
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get('data');
-        }
-        
-        // Função para decodificar os dados
-        function decodeWorkspaceData(encodedData) {
-            try {
-                return JSON.parse(decodeURIComponent(encodedData));
-            } catch (error) {
-                console.error('Erro ao decodificar dados:', error);
-                return null;
-            }
-        }
-        
-        // Detectar a extensão instalada
-        function detectExtension() {
-            const statusEl = document.getElementById('status');
-            
-            // Tentar encontrar o ID da extensão automaticamente
-            findExtensionId().then(id => {
-                if (id) {
-                    window.extensionId = id;
-                    document.getElementById('extensionId').textContent = id;
-                    document.getElementById('extensionInfo').style.display = 'block';
-                    statusEl.innerHTML = '<div class="success">✅ Extensão detectada!</div>';
-                    loadWorkspaceData();
-                } else {
-                    statusEl.innerHTML = `
-                        <div class="warning">⚠️ Extensão não detectada</div>
-                        <p>Instale a extensão Workspaces Saver para melhor experiência</p>
-                    `;
-                    loadWorkspaceData();
-                }
-            });
-        }
-        
-        // Tentar encontrar o ID da extensão
-        function findExtensionId() {
-            return new Promise((resolve) => {
-                // Tentativa 1: Procurar extensão conhecida
-                const knownIds = [
-                    // Adicione IDs conhecidos da sua extensão aqui
-                ];
-                
-                // Tentativa 2: Verificar se chrome.runtime está disponível
-                if (typeof chrome !== 'undefined' && chrome.runtime) {
-                    // Tentar enviar mensagem para extensões comuns
-                    chrome.runtime.sendMessage('unknown', { action: 'ping' }, (response) => {
-                        // Isso vai falar, mas nos dá informações de erro úteis
-                    });
-                }
-                
-                resolve(null); // Retorna null se não encontrar
-            });
-        }
-        
-        // Carregar dados do workspace
-        function loadWorkspaceData() {
-            const encodedData = getUrlParams();
-            
-            if (encodedData) {
-                workspaceData = decodeWorkspaceData(encodedData);
-                
-                if (workspaceData && Array.isArray(workspaceData)) {
-                    showWorkspaceData();
-                } else {
-                    showError('Dados do workspace inválidos.');
-                }
-            } else {
-                showError('Nenhum workspace encontrado na URL.');
-            }
-        }
-        
-        // Mostrar dados do workspace
-        function showWorkspaceData() {
-            const statusEl = document.getElementById('status');
-            const actionButtons = document.getElementById('actionButtons');
-            
-            statusEl.innerHTML = `
-                <div class="success">✅ Workspace carregado!</div>
-                <p>${workspaceData.length} guias prontas para abrir</p>
-            `;
-            
-            actionButtons.style.display = 'block';
-            updateProgress(0);
-        }
-        
-        // Mostrar erro
-        function showError(message) {
-            const statusEl = document.getElementById('status');
-            statusEl.innerHTML = `
-                <div class="error">❌ ${message}</div>
-            `;
-        }
-        
-        // Atualizar barra de progresso
-        function updateProgress(percent) {
-            const progressBar = document.getElementById('progressBar');
-            progressBar.style.width = percent + '%';
-        }
-        
-        // Abrir usando a extensão (MÉTODO PREFERIDO)
-        async function openWithExtension() {
-            if (!workspaceData) return;
-            
-            const statusEl = document.getElementById('status');
-            const openBtn = document.getElementById('openWithExtensionBtn');
-            
-            openBtn.disabled = true;
-            openBtn.textContent = 'Abrindo com extensão...';
-            statusEl.innerHTML = `
-                <div class="loading"></div>
-                <p class="warning">Abrindo ${workspaceData.length} guias via extensão...</p>
-            `;
-            
-            try {
-                // Tentar comunicação com a extensão
-                if (typeof chrome !== 'undefined' && chrome.runtime) {
-                    chrome.runtime.sendMessage(window.extensionId, {
-                        action: 'openWorkspace',
-                        urls: workspaceData
-                    }, (response) => {
-                        if (response && response.success) {
-                            updateProgress(100);
-                            statusEl.innerHTML = `
-                                <div class="success">🎉 Sucesso!</div>
-                                <p>${response.opened || workspaceData.length} guias abertas via extensão</p>
-                                <small>Esta página pode ser fechada</small>
-                            `;
-                        } else {
-                            throw new Error('Extensão não respondeu');
-                        }
-                    });
-                } else {
-                    throw new Error('API Chrome não disponível');
-                }
-            } catch (error) {
-                console.error('Erro com extensão:', error);
-                statusEl.innerHTML = `
-                    <div class="warning">⚠️ Não foi possível usar a extensão</div>
-                    <p>Tentando método alternativo...</p>
-                `;
-                // Fallback para método automático
-                setTimeout(() => openFallback(), 1000);
-            }
-        }
-        
-        // Método fallback - tentar abrir automaticamente
-        async function openFallback() {
-            if (!workspaceData) return;
-            
-            const statusEl = document.getElementById('status');
-            const openBtn = document.getElementById('openFallbackBtn');
-            
-            openBtn.disabled = true;
-            openBtn.textContent = 'Abrindo...';
-            
-            let openedCount = 0;
-            let failedUrls = [];
-            
-            statusEl.innerHTML = `
-                <div class="loading"></div>
-                <p class="warning">Abrindo ${workspaceData.length} guias...</p>
-                <small>O navegador pode bloquear algumas abas</small>
-            `;
-            
-            // Método mais agressivo com fallbacks
-            for (let i = 0; i < workspaceData.length; i++) {
-                const url = workspaceData[i];
-                
-                updateProgress((i / workspaceData.length) * 100);
-                statusEl.innerHTML = `
-                    <div class="loading"></div>
-                    <p class="warning">Abrindo guia ${i + 1} de ${workspaceData.length}</p>
-                `;
-                
-                let success = false;
-                
-                // Tentativa 1: window.open normal
-                try {
-                    const newWindow = window.open(url, '_blank');
-                    if (newWindow && !newWindow.closed) {
-                        success = true;
-                        openedCount++;
-                    }
-                } catch (e) {}
-                
-                if (!success) {
-                    // Tentativa 2: window.open com features
-                    try {
-                        const newWindow = window.open(url, '_blank', 'width=100,height=100,left=10000,top=10000');
-                        if (newWindow) {
-                            success = true;
-                            openedCount++;
-                            setTimeout(() => newWindow.close(), 100);
-                        }
-                    } catch (e) {}
-                }
-                
-                if (!success) {
-                    failedUrls.push(url);
-                }
-                
-                // Delay entre abas
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-            
-            updateProgress(100);
-            showResults(openedCount, failedUrls);
-        }
-        
-        // Mostrar resultados
-        function showResults(openedCount, failedUrls) {
-            const statusEl = document.getElementById('status');
-            const resultsEl = document.getElementById('results');
-            const actionButtons = document.getElementById('actionButtons');
-            
-            actionButtons.style.display = 'none';
-            
-            if (failedUrls.length === 0) {
-                statusEl.innerHTML = `
-                    <div class="success">🎉 Sucesso!</div>
-                    <p>Todas as ${openedCount} guias foram abertas</p>
-                `;
-            } else {
-                statusEl.innerHTML = `
-                    <div class="warning">⚠️ Resultado Parcial</div>
-                    <p>${openedCount} guias abertas, ${failedUrls.length} bloqueadas</p>
-                `;
-                
-                resultsEl.innerHTML = `
-                    <div class="status warning">
-                        <h4>Guias bloqueadas (clique para abrir manualmente):</h4>
-                        <div style="max-height: 200px; overflow-y: auto; margin-top: 10px;">
-                            ${failedUrls.map(url => `
-                                <div style="margin: 5px 0;">
-                                    <a href="${url}" target="_blank" style="color: var(--accent); text-decoration: none;">
-                                        🔗 ${url}
-                                    </a>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            }
-        }
-
-
-        // Função para encontrar a extensão dinamicamente
-async function findExtensionId() {
-  try {
-    // Tenta encontrar a extensão pelo nome
-    const extensions = await chrome.management.getAll();
-    const extension = extensions.find(ext => 
-      ext.name === "Workspaces Saver" && 
-      ext.enabled
-    );
-    return extension ? extension.id : null;
-  } catch (e) {
-    console.error('Erro ao buscar extensão:', e);
-    return null;
-  }
-}
-
-// Função principal modificada
-async function openAllViaExtension(urls) {
-  if (!urls || !urls.length) return alert('Nenhuma URL.');
+  <h1>📁 Workspace Compartilhado</h1>
   
-  let extId = "nnidkpihcfemhdejddiggaklbomnngjc"; // ID fixo
-  
-  // Se o ID fixo não funcionar, tenta encontrar dinamicamente
-  if (extId === "nnidkpihcfemhdejddiggaklbomnngjc" || !extId) {
-    extId = await findExtensionId();
-    if (!extId) {
-      return alert('Extensão Workspaces Saver não encontrada. Por favor, instale a extensão primeiro.');
+  <div id="content">
+    <p>Carregando workspace...</p>
+  </div>
+
+  <div class="warning" id="extensionWarning" style="display: none;">
+    <strong>⚠️ Extensão necessária:</strong> Para abrir todas as abas automaticamente, 
+    você precisa ter a extensão "Workspaces Saver" instalada.
+    <button id="installExtension" style="margin-left: 10px;">Instalar Extensão</button>
+  </div>
+
+  <div id="actions" style="display: none;">
+    <button id="openAllBtn">🔓 Abrir Todas as Abas</button>
+    <button id="copyImportBtn" class="secondary">📋 Copiar Link de Importação</button>
+    <button id="openIndividualBtn" class="secondary">🔗 Abrir Abas Individualmente</button>
+  </div>
+
+  <script>
+    // Extrai URLs do parâmetro data na URL
+    function getUrlsFromUrl() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const dataParam = urlParams.get('data');
+      if (!dataParam) {
+        return [];
+      }
+      try {
+        return JSON.parse(decodeURIComponent(dataParam));
+      } catch (e) {
+        console.error('Erro ao parsear URLs:', e);
+        return [];
+      }
     }
-  }
 
-  try {
-    chrome.runtime.sendMessage(extId, { type: 'open_tabs', urls }, (resp) => {
-      if (chrome.runtime.lastError) {
-        alert('Extensão não encontrada ou sem permissão para conectar. Por favor instale a extensão e tente novamente.');
-      } else if (resp && resp.ok) {
-        alert('Solicitação enviada à extensão. As abas serão abertas.');
-      } else {
-        alert('Resposta da extensão: ' + (resp && resp.error ? resp.error : 'erro desconhecido'));
+    // Função para encontrar a extensão dinamicamente
+    async function findExtensionId() {
+      try {
+        // Tenta encontrar a extensão pelo nome
+        const extensions = await chrome.management.getAll();
+        const extension = extensions.find(ext => 
+          ext.name === "Workspaces Saver" && 
+          ext.enabled
+        );
+        return extension ? extension.id : null;
+      } catch (e) {
+        console.error('Erro ao buscar extensão:', e);
+        return null;
+      }
+    }
+
+    // Função principal para abrir abas via extensão
+    async function openAllViaExtension(urls) {
+      if (!urls || !urls.length) return alert('Nenhuma URL encontrada.');
+      
+      // Tenta encontrar a extensão dinamicamente
+      const extId = await findExtensionId();
+      if (!extId) {
+        document.getElementById('extensionWarning').style.display = 'block';
+        return;
+      }
+
+      try {
+        chrome.runtime.sendMessage(extId, { type: 'open_tabs', urls }, (resp) => {
+          if (chrome.runtime.lastError) {
+            document.getElementById('extensionWarning').style.display = 'block';
+          } else if (resp && resp.ok) {
+            alert(`✅ ${urls.length} abas serão abertas pela extensão!`);
+          } else {
+            alert('❌ Resposta da extensão: ' + (resp && resp.error ? resp.error : 'erro desconhecido'));
+          }
+        });
+      } catch (e) {
+        document.getElementById('extensionWarning').style.display = 'block';
+      }
+    }
+
+    // Função para abrir abas individualmente (fallback)
+    function openUrlsIndividual(urls) {
+      urls.forEach(url => {
+        window.open(url, '_blank');
+      });
+      alert(`🔓 ${urls.length} abas abertas individualmente!`);
+    }
+
+    // Função para copiar link de importação
+    async function copyImportLink(urls) {
+      const encoded = encodeURIComponent(JSON.stringify(urls));
+      const importLink = `https://lucas-brito-de-sousa.github.io/meu-repositorio/share.html?data=${encoded}`;
+      
+      try {
+        await navigator.clipboard.writeText(importLink);
+        alert('✅ Link de importação copiado! Cole no campo "Importar" da extensão Workspaces Saver.');
+      } catch (e) {
+        // Fallback
+        prompt('📋 Copie o link de importação abaixo:', importLink);
+      }
+    }
+
+    // Inicialização da página
+    document.addEventListener('DOMContentLoaded', async () => {
+      const urls = getUrlsFromUrl();
+      const contentDiv = document.getElementById('content');
+      const actionsDiv = document.getElementById('actions');
+
+      if (!urls.length) {
+        contentDiv.innerHTML = '<p style="color: red;">❌ Nenhum workspace encontrado no link.</p>';
+        return;
+      }
+
+      // Exibe a lista de URLs
+      let html = `<h2>📋 ${urls.length} Abas no Workspace</h2>`;
+      html += '<ul>';
+      urls.forEach(url => {
+        html += `<li><a href="${url}" target="_blank">${url}</a></li>`;
+      });
+      html += '</ul>';
+      contentDiv.innerHTML = html;
+
+      // Mostra os botões de ação
+      actionsDiv.style.display = 'block';
+
+      // Configura os event listeners
+      document.getElementById('openAllBtn').addEventListener('click', () => openAllViaExtension(urls));
+      document.getElementById('copyImportBtn').addEventListener('click', () => copyImportLink(urls));
+      document.getElementById('openIndividualBtn').addEventListener('click', () => openUrlsIndividual(urls));
+      document.getElementById('installExtension').addEventListener('click', () => {
+        alert('Para instalar a extensão, visite: chrome://extensions/ e adicione a extensão "Workspaces Saver"');
+      });
+
+      // Verifica se a extensão está instalada
+      const extId = await findExtensionId();
+      if (!extId) {
+        document.getElementById('extensionWarning').style.display = 'block';
       }
     });
-  } catch (e) {
-    alert('Não foi possível enviar mensagem para a extensão: ' + e.message);
-  }
-}
-        
-        // Inicializar
-        document.addEventListener('DOMContentLoaded', detectExtension);
-    </script>
-
-    
+  </script>
 </body>
 </html>
