@@ -76,12 +76,14 @@
             background: linear-gradient(135deg, var(--accent), var(--accent-2));
             border: none;
             color: #04263b;
-            padding: 12px 24px;
+            padding: 15px 30px;
             border-radius: 25px;
             cursor: pointer;
             font-weight: bold;
-            margin: 5px;
+            font-size: 1.1em;
+            margin: 10px 0;
             transition: transform 0.2s;
+            width: 100%;
         }
         
         button:hover {
@@ -112,6 +114,23 @@
             font-size: 0.9em;
         }
         
+        .progress-container {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            margin: 20px 0;
+            overflow: hidden;
+            height: 10px;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #00ccff);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
@@ -123,23 +142,21 @@
         
         <div id="status" class="status">
             <div class="loading"></div>
-            <p>Aguardando dados do workspace...</p>
+            <p>Preparando para abrir suas guias...</p>
+        </div>
+        
+        <div class="progress-container">
+            <div class="progress-bar" id="progressBar"></div>
         </div>
         
         <div id="urlList" class="url-list" style="display: none;">
-            <h3>Guias para abrir:</h3>
+            <h3>Guias que serão abertas:</h3>
             <div id="urlItems"></div>
         </div>
         
         <div style="text-align: center; margin-top: 20px;">
             <button id="openAllBtn" style="display: none;" onclick="openAllTabs()">
-                🔗 Abrir Todas as Guias
-            </button>
-            <button id="openOneByOneBtn" style="display: none;" onclick="openOneByOne()">
-                ▶️ Abrir Uma por Uma
-            </button>
-            <button id="copyLinkBtn" style="display: none;" onclick="copyImportLink()">
-                📋 Copiar Link de Importação
+                🔗 Abrir Todas as Guias Automaticamente
             </button>
         </div>
         
@@ -148,6 +165,7 @@
 
     <script>
         let workspaceData = null;
+        let isOpening = false;
         
         // Função para obter parâmetros da URL
         function getUrlParams() {
@@ -189,8 +207,6 @@
             const urlListEl = document.getElementById('urlList');
             const urlItemsEl = document.getElementById('urlItems');
             const openAllBtn = document.getElementById('openAllBtn');
-            const openOneByOneBtn = document.getElementById('openOneByOneBtn');
-            const copyLinkBtn = document.getElementById('copyLinkBtn');
             
             statusEl.innerHTML = `
                 <div class="success">✅ Workspace carregado!</div>
@@ -203,10 +219,13 @@
             ).join('');
             urlListEl.style.display = 'block';
             
-            // Mostrar botões
-            openAllBtn.style.display = 'inline-block';
-            openOneByOneBtn.style.display = 'inline-block';
-            copyLinkBtn.style.display = 'inline-block';
+            // Mostrar botão principal
+            openAllBtn.style.display = 'block';
+            
+            // Iniciar automaticamente após 1 segundo
+            setTimeout(() => {
+                openAllTabs();
+            }, 1000);
         }
         
         // Mostrar erro
@@ -220,144 +239,144 @@
             `;
         }
         
-        // Abrir todas as guias
+        // Atualizar barra de progresso
+        function updateProgress(percent) {
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = percent + '%';
+        }
+        
+        // Método melhorado para abrir guias
         async function openAllTabs() {
-            if (!workspaceData) return;
+            if (!workspaceData || isOpening) return;
             
+            isOpening = true;
             const openAllBtn = document.getElementById('openAllBtn');
             const statusEl = document.getElementById('status');
             
             openAllBtn.disabled = true;
-            openAllBtn.textContent = 'Abrindo...';
-            statusEl.innerHTML = `
-                <div class="loading"></div>
-                <p class="warning">Abrindo ${workspaceData.length} guias...</p>
-            `;
+            openAllBtn.textContent = 'Abrindo guias...';
             
             let openedCount = 0;
             let failedUrls = [];
             
-            // Abrir em lotes para evitar bloqueio
-            const batchSize = 3;
-            for (let i = 0; i < workspaceData.length; i += batchSize) {
-                const batch = workspaceData.slice(i, i + batchSize);
+            // Estratégia: abrir em grupos menores com delays maiores
+            const groupSize = 2; // Reduzido para 2 por vez
+            const delayBetweenGroups = 2000; // 2 segundos entre grupos
+            
+            statusEl.innerHTML = `
+                <div class="loading"></div>
+                <p class="warning">Iniciando abertura de ${workspaceData.length} guias...</p>
+                <small>Por favor, NÃO feche esta página</small>
+            `;
+            
+            for (let groupIndex = 0; groupIndex < workspaceData.length; groupIndex += groupSize) {
+                if (!isOpening) break;
                 
-                for (const url of batch) {
+                const group = workspaceData.slice(groupIndex, groupIndex + groupSize);
+                const groupNumber = Math.floor(groupIndex / groupSize) + 1;
+                const totalGroups = Math.ceil(workspaceData.length / groupSize);
+                
+                // Atualizar status
+                statusEl.innerHTML = `
+                    <div class="loading"></div>
+                    <p class="warning">Abrindo grupo ${groupNumber} de ${totalGroups}</p>
+                    <small>${groupIndex + 1}-${Math.min(groupIndex + groupSize, workspaceData.length)} de ${workspaceData.length} guias</small>
+                `;
+                
+                updateProgress((groupIndex / workspaceData.length) * 100);
+                
+                // Abrir grupo atual
+                for (const url of group) {
                     try {
-                        const newWindow = window.open(url, '_blank');
-                        if (newWindow && !newWindow.closed) {
-                            openedCount++;
-                        } else {
-                            failedUrls.push(url);
+                        // Tentativa 1: window.open normal
+                        let newWindow = window.open(url, '_blank');
+                        
+                        // Verificação robusta se foi bloqueado
+                        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+                            // Tentativa 2: com features específicas
+                            newWindow = window.open(url, '_blank', 'width=100,height=100');
+                            
+                            if (!newWindow || newWindow.closed) {
+                                failedUrls.push(url);
+                                continue;
+                            }
                         }
+                        
+                        openedCount++;
+                        
+                        // Fechar janela pequena imediatamente se abrimos uma
+                        if (newWindow && newWindow.location.href === 'about:blank') {
+                            setTimeout(() => {
+                                try {
+                                    newWindow.close();
+                                } catch (e) {
+                                    // Ignora erros ao fechar
+                                }
+                            }, 100);
+                        }
+                        
                     } catch (error) {
                         failedUrls.push(url);
                     }
                     
-                    // Atualizar status
-                    statusEl.innerHTML = `
-                        <div class="loading"></div>
-                        <p class="warning">Abrindo ${i + batch.length}/${workspaceData.length} guias...</p>
-                    `;
+                    // Pequeno delay entre abas do mesmo grupo
+                    await new Promise(resolve => setTimeout(resolve, 300));
                 }
                 
-                // Aguardar entre lotes
-                if (i + batchSize < workspaceData.length) {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                // Delay maior entre grupos (exceto no último grupo)
+                if (groupIndex + groupSize < workspaceData.length) {
+                    await new Promise(resolve => setTimeout(resolve, delayBetweenGroups));
                 }
             }
             
-            // Mostrar resultados
+            // Finalizar
+            updateProgress(100);
             showResults(openedCount, failedUrls);
-            openAllBtn.disabled = false;
-            openAllBtn.textContent = '🔗 Abrir Todas as Guias';
-        }
-        
-        // Abrir uma por uma
-        async function openOneByOne() {
-            if (!workspaceData) return;
-            
-            const openOneByOneBtn = document.getElementById('openOneByOneBtn');
-            const statusEl = document.getElementById('status');
-            
-            openOneByOneBtn.disabled = true;
-            
-            let openedCount = 0;
-            let failedUrls = [];
-            
-            for (let i = 0; i < workspaceData.length; i++) {
-                const url = workspaceData[i];
-                
-                statusEl.innerHTML = `
-                    <div class="loading"></div>
-                    <p class="warning">Abrindo guia ${i + 1}/${workspaceData.length}</p>
-                    <small>${url}</small>
-                `;
-                
-                const shouldContinue = i === 0 || confirm(`Guia ${i} aberta. Abrir próxima? (${i + 1}/${workspaceData.length})`);
-                
-                if (!shouldContinue) break;
-                
-                try {
-                    const newWindow = window.open(url, '_blank');
-                    if (newWindow && !newWindow.closed) {
-                        openedCount++;
-                    } else {
-                        failedUrls.push(url);
-                    }
-                } catch (error) {
-                    failedUrls.push(url);
-                }
-                
-                // Pequeno delay
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-            
-            showResults(openedCount, failedUrls);
-            openOneByOneBtn.disabled = false;
-        }
-        
-        // Copiar link de importação
-        function copyImportLink() {
-            if (!workspaceData) return;
-            
-            const encoded = encodeURIComponent(JSON.stringify(workspaceData));
-            const importLink = window.location.origin + window.location.pathname + '?data=' + encoded;
-            
-            navigator.clipboard.writeText(importLink).then(() => {
-                alert('✅ Link de importação copiado! Cole na extensão Workspaces Saver.');
-            }).catch(() => {
-                prompt('📋 Copie o link abaixo:', importLink);
-            });
+            openAllBtn.style.display = 'none';
+            isOpening = false;
         }
         
         // Mostrar resultados
         function showResults(openedCount, failedUrls) {
+            const statusEl = document.getElementById('status');
             const resultsEl = document.getElementById('results');
             
             if (failedUrls.length === 0) {
-                resultsEl.innerHTML = `
-                    <div class="status success">
-                        ✅ ${openedCount} guias abertas com sucesso!
-                    </div>
+                statusEl.innerHTML = `
+                    <div class="success">🎉 Sucesso!</div>
+                    <p>Todas as ${openedCount} guias foram abertas automaticamente</p>
+                    <small>Esta página pode ser fechada</small>
                 `;
             } else {
+                statusEl.innerHTML = `
+                    <div class="warning">⚠️ Resultado Parcial</div>
+                    <p>${openedCount} guias abertas, ${failedUrls.length} bloqueadas</p>
+                `;
+                
                 resultsEl.innerHTML = `
                     <div class="status warning">
-                        ⚠️ ${openedCount} guias abertas, ${failedUrls.length} falharam
-                        <div style="margin-top: 10px; font-size: 0.9em;">
-                            <strong>URLs que falharam:</strong>
-                            <div style="max-height: 100px; overflow-y: auto; margin-top: 5px;">
-                                ${failedUrls.map(url => `<div>🔗 ${url}</div>`).join('')}
-                            </div>
+                        <h4>Guias que precisam ser abertas manualmente:</h4>
+                        <div style="max-height: 200px; overflow-y: auto; margin-top: 10px;">
+                            ${failedUrls.map(url => `
+                                <div class="url-item">
+                                    <a href="${url}" target="_blank" style="color: var(--accent); text-decoration: none;">
+                                        🔗 ${url}
+                                    </a>
+                                </div>
+                            `).join('')}
                         </div>
+                        <p style="margin-top: 10px; font-size: 0.9em;">
+                            <strong>Dica:</strong> Clique nos links acima para abrir manualmente
+                        </p>
                     </div>
                 `;
             }
         }
         
-        // Inicializar
-        document.addEventListener('DOMContentLoaded', loadWorkspaceData);
+        // Inicializar automaticamente
+        document.addEventListener('DOMContentLoaded', function() {
+            loadWorkspaceData();
+        });
     </script>
 </body>
 </html>
