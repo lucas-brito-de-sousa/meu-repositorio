@@ -41,16 +41,15 @@
             width: 100%;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
             border: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center;
         }
         
         h1 {
-            text-align: center;
             margin-bottom: 20px;
             font-size: 2em;
         }
         
         .status {
-            text-align: center;
             margin: 20px 0;
             padding: 20px;
             background: rgba(255, 255, 255, 0.1);
@@ -83,7 +82,6 @@
             font-size: 1.1em;
             margin: 10px 0;
             transition: transform 0.2s;
-            width: 100%;
         }
         
         button:hover {
@@ -94,24 +92,6 @@
             opacity: 0.6;
             cursor: not-allowed;
             transform: none;
-        }
-        
-        .url-list {
-            max-height: 300px;
-            overflow-y: auto;
-            margin: 20px 0;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 10px;
-            padding: 15px;
-        }
-        
-        .url-item {
-            padding: 8px;
-            margin: 5px 0;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 5px;
-            word-break: break-all;
-            font-size: 0.9em;
         }
         
         .progress-container {
@@ -134,6 +114,16 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        
+        .extension-id {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 0.9em;
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
@@ -142,21 +132,27 @@
         
         <div id="status" class="status">
             <div class="loading"></div>
-            <p>Preparando para abrir suas guias...</p>
+            <p>Conectando com a extensão...</p>
         </div>
         
         <div class="progress-container">
             <div class="progress-bar" id="progressBar"></div>
         </div>
         
-        <div id="urlList" class="url-list" style="display: none;">
-            <h3>Guias que serão abertas:</h3>
-            <div id="urlItems"></div>
+        <div id="extensionInfo" style="display: none;">
+            <h3>📋 ID da Extensão:</h3>
+            <div class="extension-id" id="extensionId"></div>
+            <p style="font-size: 0.9em; margin-top: 10px;">
+                Certifique-se de que a extensão Workspaces Saver está instalada
+            </p>
         </div>
         
-        <div style="text-align: center; margin-top: 20px;">
-            <button id="openAllBtn" style="display: none;" onclick="openAllTabs()">
-                🔗 Abrir Todas as Guias Automaticamente
+        <div id="actionButtons" style="display: none;">
+            <button id="openWithExtensionBtn" onclick="openWithExtension()">
+                🔗 Abrir com Extensão (Recomendado)
+            </button>
+            <button id="openFallbackBtn" onclick="openFallback()">
+                ⚡ Tentar Abrir Automaticamente
             </button>
         </div>
         
@@ -165,13 +161,12 @@
 
     <script>
         let workspaceData = null;
-        let isOpening = false;
+        const extensionId = 'YOUR_EXTENSION_ID'; // Você vai substituir isso
         
         // Função para obter parâmetros da URL
         function getUrlParams() {
             const urlParams = new URLSearchParams(window.location.search);
-            const data = urlParams.get('data');
-            return data;
+            return urlParams.get('data');
         }
         
         // Função para decodificar os dados
@@ -184,7 +179,49 @@
             }
         }
         
-        // Carregar dados da URL
+        // Detectar a extensão instalada
+        function detectExtension() {
+            const statusEl = document.getElementById('status');
+            
+            // Tentar encontrar o ID da extensão automaticamente
+            findExtensionId().then(id => {
+                if (id) {
+                    window.extensionId = id;
+                    document.getElementById('extensionId').textContent = id;
+                    document.getElementById('extensionInfo').style.display = 'block';
+                    statusEl.innerHTML = '<div class="success">✅ Extensão detectada!</div>';
+                    loadWorkspaceData();
+                } else {
+                    statusEl.innerHTML = `
+                        <div class="warning">⚠️ Extensão não detectada</div>
+                        <p>Instale a extensão Workspaces Saver para melhor experiência</p>
+                    `;
+                    loadWorkspaceData();
+                }
+            });
+        }
+        
+        // Tentar encontrar o ID da extensão
+        function findExtensionId() {
+            return new Promise((resolve) => {
+                // Tentativa 1: Procurar extensão conhecida
+                const knownIds = [
+                    // Adicione IDs conhecidos da sua extensão aqui
+                ];
+                
+                // Tentativa 2: Verificar se chrome.runtime está disponível
+                if (typeof chrome !== 'undefined' && chrome.runtime) {
+                    // Tentar enviar mensagem para extensões comuns
+                    chrome.runtime.sendMessage('unknown', { action: 'ping' }, (response) => {
+                        // Isso vai falar, mas nos dá informações de erro úteis
+                    });
+                }
+                
+                resolve(null); // Retorna null se não encontrar
+            });
+        }
+        
+        // Carregar dados do workspace
         function loadWorkspaceData() {
             const encodedData = getUrlParams();
             
@@ -194,7 +231,7 @@
                 if (workspaceData && Array.isArray(workspaceData)) {
                     showWorkspaceData();
                 } else {
-                    showError('Dados do workspace inválidos ou corrompidos.');
+                    showError('Dados do workspace inválidos.');
                 }
             } else {
                 showError('Nenhum workspace encontrado na URL.');
@@ -204,28 +241,15 @@
         // Mostrar dados do workspace
         function showWorkspaceData() {
             const statusEl = document.getElementById('status');
-            const urlListEl = document.getElementById('urlList');
-            const urlItemsEl = document.getElementById('urlItems');
-            const openAllBtn = document.getElementById('openAllBtn');
+            const actionButtons = document.getElementById('actionButtons');
             
             statusEl.innerHTML = `
                 <div class="success">✅ Workspace carregado!</div>
-                <p>${workspaceData.length} guias encontradas</p>
+                <p>${workspaceData.length} guias prontas para abrir</p>
             `;
             
-            // Mostrar lista de URLs
-            urlItemsEl.innerHTML = workspaceData.map(url => 
-                `<div class="url-item">🔗 ${url}</div>`
-            ).join('');
-            urlListEl.style.display = 'block';
-            
-            // Mostrar botão principal
-            openAllBtn.style.display = 'block';
-            
-            // Iniciar automaticamente após 1 segundo
-            setTimeout(() => {
-                openAllTabs();
-            }, 1000);
+            actionButtons.style.display = 'block';
+            updateProgress(0);
         }
         
         // Mostrar erro
@@ -233,9 +257,6 @@
             const statusEl = document.getElementById('status');
             statusEl.innerHTML = `
                 <div class="error">❌ ${message}</div>
-                <p style="margin-top: 10px;">
-                    Certifique-se de que o link foi copiado corretamente da extensão Workspaces Saver.
-                </p>
             `;
         }
         
@@ -245,107 +266,128 @@
             progressBar.style.width = percent + '%';
         }
         
-        // Método melhorado para abrir guias
-        async function openAllTabs() {
-            if (!workspaceData || isOpening) return;
+        // Abrir usando a extensão (MÉTODO PREFERIDO)
+        async function openWithExtension() {
+            if (!workspaceData) return;
             
-            isOpening = true;
-            const openAllBtn = document.getElementById('openAllBtn');
             const statusEl = document.getElementById('status');
+            const openBtn = document.getElementById('openWithExtensionBtn');
             
-            openAllBtn.disabled = true;
-            openAllBtn.textContent = 'Abrindo guias...';
+            openBtn.disabled = true;
+            openBtn.textContent = 'Abrindo com extensão...';
+            statusEl.innerHTML = `
+                <div class="loading"></div>
+                <p class="warning">Abrindo ${workspaceData.length} guias via extensão...</p>
+            `;
+            
+            try {
+                // Tentar comunicação com a extensão
+                if (typeof chrome !== 'undefined' && chrome.runtime) {
+                    chrome.runtime.sendMessage(window.extensionId, {
+                        action: 'openWorkspace',
+                        urls: workspaceData
+                    }, (response) => {
+                        if (response && response.success) {
+                            updateProgress(100);
+                            statusEl.innerHTML = `
+                                <div class="success">🎉 Sucesso!</div>
+                                <p>${response.opened || workspaceData.length} guias abertas via extensão</p>
+                                <small>Esta página pode ser fechada</small>
+                            `;
+                        } else {
+                            throw new Error('Extensão não respondeu');
+                        }
+                    });
+                } else {
+                    throw new Error('API Chrome não disponível');
+                }
+            } catch (error) {
+                console.error('Erro com extensão:', error);
+                statusEl.innerHTML = `
+                    <div class="warning">⚠️ Não foi possível usar a extensão</div>
+                    <p>Tentando método alternativo...</p>
+                `;
+                // Fallback para método automático
+                setTimeout(() => openFallback(), 1000);
+            }
+        }
+        
+        // Método fallback - tentar abrir automaticamente
+        async function openFallback() {
+            if (!workspaceData) return;
+            
+            const statusEl = document.getElementById('status');
+            const openBtn = document.getElementById('openFallbackBtn');
+            
+            openBtn.disabled = true;
+            openBtn.textContent = 'Abrindo...';
             
             let openedCount = 0;
             let failedUrls = [];
             
-            // Estratégia: abrir em grupos menores com delays maiores
-            const groupSize = 2; // Reduzido para 2 por vez
-            const delayBetweenGroups = 2000; // 2 segundos entre grupos
-            
             statusEl.innerHTML = `
                 <div class="loading"></div>
-                <p class="warning">Iniciando abertura de ${workspaceData.length} guias...</p>
-                <small>Por favor, NÃO feche esta página</small>
+                <p class="warning">Abrindo ${workspaceData.length} guias...</p>
+                <small>O navegador pode bloquear algumas abas</small>
             `;
             
-            for (let groupIndex = 0; groupIndex < workspaceData.length; groupIndex += groupSize) {
-                if (!isOpening) break;
+            // Método mais agressivo com fallbacks
+            for (let i = 0; i < workspaceData.length; i++) {
+                const url = workspaceData[i];
                 
-                const group = workspaceData.slice(groupIndex, groupIndex + groupSize);
-                const groupNumber = Math.floor(groupIndex / groupSize) + 1;
-                const totalGroups = Math.ceil(workspaceData.length / groupSize);
-                
-                // Atualizar status
+                updateProgress((i / workspaceData.length) * 100);
                 statusEl.innerHTML = `
                     <div class="loading"></div>
-                    <p class="warning">Abrindo grupo ${groupNumber} de ${totalGroups}</p>
-                    <small>${groupIndex + 1}-${Math.min(groupIndex + groupSize, workspaceData.length)} de ${workspaceData.length} guias</small>
+                    <p class="warning">Abrindo guia ${i + 1} de ${workspaceData.length}</p>
                 `;
                 
-                updateProgress((groupIndex / workspaceData.length) * 100);
+                let success = false;
                 
-                // Abrir grupo atual
-                for (const url of group) {
-                    try {
-                        // Tentativa 1: window.open normal
-                        let newWindow = window.open(url, '_blank');
-                        
-                        // Verificação robusta se foi bloqueado
-                        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-                            // Tentativa 2: com features específicas
-                            newWindow = window.open(url, '_blank', 'width=100,height=100');
-                            
-                            if (!newWindow || newWindow.closed) {
-                                failedUrls.push(url);
-                                continue;
-                            }
-                        }
-                        
+                // Tentativa 1: window.open normal
+                try {
+                    const newWindow = window.open(url, '_blank');
+                    if (newWindow && !newWindow.closed) {
+                        success = true;
                         openedCount++;
-                        
-                        // Fechar janela pequena imediatamente se abrimos uma
-                        if (newWindow && newWindow.location.href === 'about:blank') {
-                            setTimeout(() => {
-                                try {
-                                    newWindow.close();
-                                } catch (e) {
-                                    // Ignora erros ao fechar
-                                }
-                            }, 100);
-                        }
-                        
-                    } catch (error) {
-                        failedUrls.push(url);
                     }
-                    
-                    // Pequeno delay entre abas do mesmo grupo
-                    await new Promise(resolve => setTimeout(resolve, 300));
+                } catch (e) {}
+                
+                if (!success) {
+                    // Tentativa 2: window.open com features
+                    try {
+                        const newWindow = window.open(url, '_blank', 'width=100,height=100,left=10000,top=10000');
+                        if (newWindow) {
+                            success = true;
+                            openedCount++;
+                            setTimeout(() => newWindow.close(), 100);
+                        }
+                    } catch (e) {}
                 }
                 
-                // Delay maior entre grupos (exceto no último grupo)
-                if (groupIndex + groupSize < workspaceData.length) {
-                    await new Promise(resolve => setTimeout(resolve, delayBetweenGroups));
+                if (!success) {
+                    failedUrls.push(url);
                 }
+                
+                // Delay entre abas
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
             
-            // Finalizar
             updateProgress(100);
             showResults(openedCount, failedUrls);
-            openAllBtn.style.display = 'none';
-            isOpening = false;
         }
         
         // Mostrar resultados
         function showResults(openedCount, failedUrls) {
             const statusEl = document.getElementById('status');
             const resultsEl = document.getElementById('results');
+            const actionButtons = document.getElementById('actionButtons');
+            
+            actionButtons.style.display = 'none';
             
             if (failedUrls.length === 0) {
                 statusEl.innerHTML = `
                     <div class="success">🎉 Sucesso!</div>
-                    <p>Todas as ${openedCount} guias foram abertas automaticamente</p>
-                    <small>Esta página pode ser fechada</small>
+                    <p>Todas as ${openedCount} guias foram abertas</p>
                 `;
             } else {
                 statusEl.innerHTML = `
@@ -355,28 +397,23 @@
                 
                 resultsEl.innerHTML = `
                     <div class="status warning">
-                        <h4>Guias que precisam ser abertas manualmente:</h4>
+                        <h4>Guias bloqueadas (clique para abrir manualmente):</h4>
                         <div style="max-height: 200px; overflow-y: auto; margin-top: 10px;">
                             ${failedUrls.map(url => `
-                                <div class="url-item">
+                                <div style="margin: 5px 0;">
                                     <a href="${url}" target="_blank" style="color: var(--accent); text-decoration: none;">
                                         🔗 ${url}
                                     </a>
                                 </div>
                             `).join('')}
                         </div>
-                        <p style="margin-top: 10px; font-size: 0.9em;">
-                            <strong>Dica:</strong> Clique nos links acima para abrir manualmente
-                        </p>
                     </div>
                 `;
             }
         }
         
-        // Inicializar automaticamente
-        document.addEventListener('DOMContentLoaded', function() {
-            loadWorkspaceData();
-        });
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', detectExtension);
     </script>
 </body>
 </html>
