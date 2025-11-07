@@ -1,23 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Workspace Share - Auto Open</title>
+<style>
+  body{font-family:Inter,Arial,sans-serif;background:#0f1724;color:#e6eef6;margin:0;padding:20px;display:flex;justify-content:center;align-items:center;min-height:100vh;}
+  .box{background:#111b2e;border-radius:14px;padding:28px;max-width:680px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,0.4);}
+  h1{font-size:22px;margin-bottom:10px;color:#7dd3fc;}
+  p{color:#9aa4b2;font-size:14px;}
+  ul{list-style:none;padding:0;margin-top:14px;max-height:340px;overflow:auto;}
+  li{padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:8px;margin-bottom:6px;}
+  a{color:#60a5fa;text-decoration:none;word-break:break-all;}
+  .status{margin-top:16px;font-size:14px;color:#7dd3fc;}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>Espaço de trabalho compartilhado</h1>
+  <p>As guias serão abertas automaticamente pela extensão (se instalada).</p>
+  <ul id="list"></ul>
+  <div class="status" id="status">Preparando...</div>
+</div>
+
 <script>
-  // urls: array já decodificada a partir do parâmetro data
-  async function openAllViaExtension(urls){
-    if(!urls || !urls.length) return alert('Nenhuma URL.');
-    const extId = "EXTENSION_ID_REPLACE_AQUI"; // copiar do chrome://extensions/
-    try {
-      chrome.runtime.sendMessage(extId, { type: 'open_tabs', urls }, (resp) => {
-        if(chrome.runtime.lastError){
-          // provável que a extensão não esteja instalada ou não permita mensagem
-          alert('Extensão não encontrada ou sem permissão para conectar. Por favor instale a extensão e tente novamente.');
-        } else if (resp && resp.ok){
-          alert('Solicitação enviada à extensão. As abas serão abertas.');
-        } else {
-          alert('Resposta da extensão: ' + (resp && resp.error ? resp.error : 'erro desconhecido'));
-        }
-      });
-    } catch (e) {
-      alert('Não foi possível enviar mensagem para a extensão: ' + e.message);
-    }
+function getParam(name){const u=new URL(window.location.href);return u.searchParams.get(name);}
+const dataParam=getParam('data')||'';
+let urls=[];
+try{urls=JSON.parse(decodeURIComponent(dataParam));}catch(e){urls=[];}
+const list=document.getElementById('list');
+if(!urls.length){list.innerHTML='<li>Nenhuma URL encontrada.</li>';}else{
+  urls.forEach(u=>{const li=document.createElement('li');const a=document.createElement('a');a.href=u;a.target='_blank';a.textContent=u;li.appendChild(a);list.appendChild(li);});
+}
+document.getElementById('status').innerText='Enviando solicitação à extensão...';
+
+(async()=>{
+  const extId='nmoighhcfmakehbmnejlonbghjpjgboc';
+  if(!urls.length)return;
+  try{
+    chrome.runtime.sendMessage(extId,{type:'open_tabs',urls},resp=>{
+      if(chrome.runtime.lastError){
+        document.getElementById('status').innerText='❌ Extensão não respondeu. Verifique se está instalada.';
+      }else if(resp&&resp.ok){
+        document.getElementById('status').innerText='✅ '+resp.opened+' guias foram abertas pela extensão.';
+      }else{
+        document.getElementById('status').innerText='⚠️ Falha ao abrir as guias.';
+      }
+    });
+  }catch(e){
+    document.getElementById('status').innerText='Erro: '+e.message;
   }
-  // Exemplo de uso: quando usuário clicar no botão
-  document.getElementById('openAllBtn').addEventListener('click', ()=> openAllViaExtension(urls));
+})();
 </script>
+</body>
+</html>
